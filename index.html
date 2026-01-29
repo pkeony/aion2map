@@ -502,7 +502,10 @@
           fillOpacity: 0.9,
         }).addTo(map);
 
-        m.bindPopup(`<b>${loc.name}</b><br>${loc.type}`);
+        m.bindPopup(`<b>${loc.name}</b>`); // 타입 제거
+        m.on('click', () => {
+          moveAndZoomTo(m);
+        });
         m.locData = loc;
         m.locId = i;
         markers.push(m);
@@ -543,8 +546,22 @@
           (m) => m.locId === allLocations.indexOf(loc)
         );
         if (!marker) return;
-        map.flyTo(marker.getLatLng(), 2, { duration: 0.8 });
-        setTimeout(() => marker.openPopup(), 300);
+        moveAndZoomTo(marker);
+      }
+
+      function moveAndZoomTo(marker) {
+        const target = marker.getLatLng();
+        const zoomLevel = map.getMaxZoom() - 0.5;
+
+        map.flyTo(target, zoomLevel, {
+          animate: true,
+          duration: 0.8,
+        });
+
+        // ⭐ 기존 팝업만 사용 (새로 만들지 않음)
+        setTimeout(() => {
+          marker.openPopup();
+        }, 300);
       }
 
       function toggleFav(name) {
@@ -647,8 +664,10 @@
       /* ================= 지도 클릭 이름 ================= */
       map.on('click', (e) => {
         const { lat, lng } = e.latlng;
-        let found = null,
-          min = 15;
+
+        let found = null;
+        let min = 15; // 클릭 허용 반경
+
         allLocations.forEach((loc) => {
           const dx = loc.x + offsetX - lng;
           const dy = loc.y - lat;
@@ -658,11 +677,9 @@
             found = loc;
           }
         });
+
         if (found) {
-          L.popup()
-            .setLatLng([found.y, found.x + offsetX])
-            .setContent(`<b>${found.name}</b><br>${found.type}`)
-            .openOn(map);
+          moveAndZoomTo(found.y, found.x + offsetX, found.name, found.type);
         }
       });
     </script>
