@@ -2,95 +2,140 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <title>아이온2 포탈 맵</title>
-
+    <title>AION2 Map</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
     <style>
       body {
         margin: 0;
+        font-family: sans-serif;
+        background: #111;
+        color: white;
+      }
+      #app {
         display: flex;
         height: 100vh;
-        font-family: Arial, sans-serif;
       }
 
+      /* ===== 왼쪽 패널 ===== */
       #sidebar {
-        width: 320px;
-        background: #111;
-        color: #fff;
+        width: 300px;
+        background: #1b1b1b;
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        z-index: 2;
+      }
+
+      #search {
         padding: 10px;
-        box-sizing: border-box;
+        font-size: 15px;
+        border-radius: 6px;
+        border: none;
+        margin-bottom: 10px;
+      }
+
+      .toggle-group {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+
+      .toggle-btn {
+        flex: 1;
+        padding: 8px;
+        background: #333;
+        border: none;
+        color: white;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+
+      .toggle-btn.active {
+        background: #0066ff;
+      }
+
+      #results {
+        flex: 1;
         overflow-y: auto;
       }
 
-      #map {
-        flex: 1;
-      }
-
-      input,
-      select,
-      button {
-        width: 100%;
-        padding: 6px;
-        margin-bottom: 6px;
-        box-sizing: border-box;
-      }
-
-      h3 {
-        margin: 10px 0 5px;
-        font-size: 14px;
-        border-bottom: 1px solid #333;
-        padding-bottom: 4px;
-      }
-
       .item {
-        padding: 6px;
-        border-bottom: 1px solid #333;
+        padding: 8px;
+        margin-bottom: 6px;
+        border-radius: 6px;
         cursor: pointer;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        font-size: 14px;
       }
 
-      .item:hover {
-        background: #222;
+      .portal {
+        background: #143d73;
+      }
+      .region {
+        background: #5a1d1d;
       }
 
       .star {
         cursor: pointer;
-        font-size: 16px;
+      }
+
+      #favoritesBox {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #333;
+      }
+
+      #favoriteList .item {
+        font-size: 13px;
+      }
+
+      /* ===== 지도 ===== */
+      #map {
+        flex: 1;
       }
     </style>
   </head>
   <body>
-    <div id="sidebar">
-      <input id="searchInput" placeholder="포탈 이름 검색 (엔터 가능)" />
+    <div id="app">
+      <div id="sidebar">
+        <input id="search" placeholder="지역 또는 포탈 검색" />
 
-      <select id="categoryFilter">
-        <option value="all">전체</option>
-        <option value="마을">마을</option>
-        <option value="야영지">야영지</option>
-        <option value="절벽">절벽</option>
-        <option value="유적">유적</option>
-        <option value="기타">기타</option>
-      </select>
+        <div class="toggle-group">
+          <button class="toggle-btn active" data-type="all">전체</button>
+          <button class="toggle-btn" data-type="portal">포탈</button>
+          <button class="toggle-btn" data-type="region">지역</button>
+        </div>
 
-      <button onclick="searchPortal()">검색</button>
+        <div id="results"></div>
 
-      <h3>검색 결과</h3>
-      <div id="results"></div>
+        <div id="favoritesBox">
+          ⭐ 즐겨찾기
+          <div id="favoriteList"></div>
+        </div>
+      </div>
 
-      <h3>즐겨찾기 ⭐</h3>
-      <div id="favorites"></div>
+      <div id="map"></div>
     </div>
 
-    <div id="map"></div>
-
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-      /* =========================
-   포탈 데이터
-========================= */
+      const WIDTH = 1026;
+      const HEIGHT = 1023;
+      const offsetX = 1;
+
+      const map = L.map('map', { crs: L.CRS.Simple, minZoom: -1, maxZoom: 3 });
+      const bounds = [
+        [0, 0],
+        [HEIGHT, WIDTH],
+      ];
+      L.imageOverlay('aion2-map.png', bounds).addTo(map);
+      map.fitBounds(bounds);
+      map.setZoom(map.getZoom() + 1);
+      setTimeout(() => map.invalidateSize(), 200);
+
+      /* ===== 데이터 (여기에 네 배열 그대로 넣으면 됨) ===== */
       const portals = [
         {
           name: '도망자 마을 절벽',
@@ -394,176 +439,162 @@
         },
       ];
 
-      /* =========================
-   지도 설정
-========================= */
-      const imageWidth = 1021;
-      const imageHeight = 1022;
+      const regions = [
+        { name: '이름없는 묘지', x: 324, y: 632 },
+        { name: '고요한 언덕', x: 319, y: 582 },
+        { name: '성소 감시초소', x: 305, y: 523 },
+        { name: '트라네인 연못', x: 365, y: 538 },
+        { name: '트라네인 구릉지', x: 380, y: 545 },
+        { name: '드레드기온 추락지', x: 410, y: 605 },
+        { name: '칼바리아 협곡', x: 431, y: 573 },
+        { name: '모슬란 숲', x: 454, y: 464 },
+        { name: '우르트헤임', x: 541, y: 536 },
+        { name: '무닌의 다리', x: 408, y: 529 },
+        { name: '정화의 숲', x: 580, y: 596 },
+        { name: '격전의 언덕', x: 623, y: 663 },
+        { name: '드라낙투스', x: 584, y: 712 },
+        { name: '바스펠트 폐허', x: 711, y: 614 },
+        { name: '그리바데 구릉지 서부', x: 659, y: 388 },
+        { name: '그리바데 구릉지 남부', x: 688, y: 372 },
+        { name: '이둔의 호수', x: 710, y: 387 },
+        { name: '그리바데 구릉지 동부', x: 740, y: 425 },
+        { name: '파프나이트 매장지', x: 676, y: 456 },
+        { name: '임페투시움 광장', x: 707, y: 304 },
+        { name: '검은발톱 부락', x: 627, y: 311 },
+        { name: '라그타 요새', x: 509, y: 301 },
+        { name: '정령의 섬', x: 790, y: 792 },
+        { name: '불멸의 섬', x: 264, y: 221 },
+      ];
 
-      const map = L.map('map', {
-        crs: L.CRS.Simple,
-        minZoom: -2,
-        maxZoom: 2,
+      const allLocations = [
+        ...portals.map((p) => ({ ...p, type: 'portal' })),
+        ...regions.map((r) => ({ ...r, type: 'region' })),
+      ];
+
+      const markers = [];
+      function markerSize() {
+        return 6 + map.getZoom() * 2;
+      }
+
+      allLocations.forEach((loc) => {
+        const color = loc.type === 'portal' ? '#2aa4ff' : '#ff3b3b';
+        const m = L.circleMarker([loc.y, loc.x + offsetX], {
+          radius: markerSize(),
+          color,
+          fillColor: color,
+          fillOpacity: 0.9,
+        }).addTo(map);
+        m.bindPopup(`<b>${loc.name}</b><br>${loc.type}`);
+        markers.push(m);
       });
 
-      const bounds = [
-        [0, 0],
-        [imageHeight, imageWidth],
-      ];
-      L.imageOverlay('aion2-map.png', bounds).addTo(map);
-      map.fitBounds(bounds);
+      map.on('zoomend', () =>
+        markers.forEach((m) => m.setRadius(markerSize()))
+      );
 
-      /* =========================
-   유틸
-========================= */
-      function normalize(str) {
-        return str.replace(/\s+/g, '').toLowerCase();
-      }
-
-      function getCategory(name) {
-        if (name.includes('마을')) return '마을';
-        if (name.includes('야영지')) return '야영지';
-        if (name.includes('절벽')) return '절벽';
-        if (name.includes('유적')) return '유적';
-        return '기타';
-      }
-
-      /* =========================
-   즐겨찾기
-========================= */
+      /* ===== 검색 & 토글 ===== */
+      let currentFilter = 'all';
+      const searchInput = document.getElementById('search');
+      const resultsDiv = document.getElementById('results');
+      const favDiv = document.getElementById('favoriteList');
       let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
 
-      /* =========================
-   마커
-========================= */
-      let activeMarker = null;
-
-      const portalMarkers = portals.map((p) => {
-        const marker = L.circleMarker([p.y, p.x], { radius: 5 }).addTo(map);
-        marker.portalName = p.name;
-        marker.category = getCategory(p.name);
-        marker.bindPopup(p.name);
-        return marker;
-      });
-
-      /* =========================
-   이동 + 중앙 보정 함수 ⭐
-========================= */
-      function focusPortal(marker) {
-        if (activeMarker) activeMarker.setStyle({ radius: 5 });
-        marker.setStyle({ radius: 9 });
-        activeMarker = marker;
-
-        const sidebarWidth = 320;
-
-        // 현재 줌 기준으로 좌표 → 픽셀 변환
-        const point = map.project(marker.getLatLng(), map.getZoom());
-
-        // 사이드바 보정 (왼쪽에 있으니까 +)
-        point.x -= sidebarWidth / 2;
-
-        // 다시 좌표로 변환
-        const targetLatLng = map.unproject(point, map.getZoom());
-
-        // ⭐ 무조건 이동
-        map.flyTo(targetLatLng, 1.5, {
-          animate: true,
-          duration: 0.6,
-        });
-
-        marker.openPopup();
+      function normalize(s) {
+        return s.replace(/\s+/g, '').toLowerCase();
       }
 
-      /* =========================
-   즐겨찾기 토글
-========================= */
-      function toggleFavorite(name) {
-        if (favorites.includes(name)) {
-          favorites = favorites.filter((f) => f !== name);
-        } else {
-          favorites.push(name);
-        }
+      document.querySelectorAll('.toggle-btn').forEach((btn) => {
+        btn.onclick = () => {
+          document
+            .querySelectorAll('.toggle-btn')
+            .forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilter = btn.dataset.type;
+          render();
+        };
+      });
 
+      function focus(loc) {
+        const marker = markers.find(
+          (m) =>
+            m.getLatLng().lat === loc.y && m.getLatLng().lng === loc.x + offsetX
+        );
+
+        if (marker) {
+          map.setView(marker.getLatLng(), 2, { animate: true });
+          marker.openPopup(); // 🔥 말풍선 열기
+        }
+      }
+
+      function toggleFav(name) {
+        favorites = favorites.includes(name)
+          ? favorites.filter((f) => f !== name)
+          : [...favorites, name];
         localStorage.setItem('favorites', JSON.stringify(favorites));
-        searchPortal();
+        render();
         renderFavorites();
       }
 
-      /* =========================
-   검색
-========================= */
-      function searchPortal() {
-        const keyword = normalize(document.getElementById('searchInput').value);
-        const category = document.getElementById('categoryFilter').value;
-        const resultsDiv = document.getElementById('results');
+      function render() {
+        const q = normalize(searchInput.value);
         resultsDiv.innerHTML = '';
+        if (!q) return;
 
-        portalMarkers
-          .filter((m) => {
-            const matchName = normalize(m.portalName).includes(keyword);
-            const matchCategory = category === 'all' || m.category === category;
-            return matchName && matchCategory;
-          })
-          .forEach((m) => {
+        allLocations.forEach((loc) => {
+          if (
+            normalize(loc.name).includes(q) &&
+            (currentFilter === 'all' || loc.type === currentFilter)
+          ) {
             const div = document.createElement('div');
-            div.className = 'item';
-
-            const isFav = favorites.includes(m.portalName);
-
-            div.innerHTML = `
-      <span>${m.portalName}</span>
-      <span class="star">${isFav ? '⭐' : '☆'}</span>
-    `;
-
-            div.onclick = () => focusPortal(m);
-
+            div.className = 'item ' + loc.type;
+            div.innerHTML = `<span>${loc.name}</span><span class="star">${favorites.includes(loc.name) ? '★' : '☆'}</span>`;
+            div.onclick = () => focus(loc);
             div.querySelector('.star').onclick = (e) => {
               e.stopPropagation();
-              toggleFavorite(m.portalName);
+              toggleFav(loc.name);
             };
-
             resultsDiv.appendChild(div);
-          });
-      }
-
-      /* =========================
-   즐겨찾기 렌더
-========================= */
-      function renderFavorites() {
-        const favDiv = document.getElementById('favorites');
-        favDiv.innerHTML = '';
-
-        portalMarkers
-          .filter((m) => favorites.includes(m.portalName))
-          .forEach((m) => {
-            const div = document.createElement('div');
-            div.className = 'item';
-
-            div.innerHTML = `
-        <span>${m.portalName}</span>
-        <span class="star">⭐</span>
-      `;
-
-            div.onclick = () => focusPortal(m);
-
-            div.querySelector('.star').onclick = (e) => {
-              e.stopPropagation();
-              toggleFavorite(m.portalName);
-            };
-
-            favDiv.appendChild(div);
-          });
-      }
-
-      /* 엔터 검색 */
-      document
-        .getElementById('searchInput')
-        .addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') searchPortal();
+          }
         });
+      }
 
-      /* 초기 렌더 */
+      function renderFavorites() {
+        favDiv.innerHTML = '';
+        favorites.forEach((name) => {
+          const loc = allLocations.find((l) => l.name === name);
+          if (!loc) return;
+          const div = document.createElement('div');
+          div.className = 'item ' + loc.type;
+          div.textContent = name;
+          div.onclick = () => focus(loc);
+          favDiv.appendChild(div);
+        });
+      }
+
+      searchInput.addEventListener('input', render);
       renderFavorites();
+
+      /* ===== 지도 클릭시 이름 표시 ===== */
+      map.on('click', (e) => {
+        const { lat, lng } = e.latlng;
+        let found = null,
+          min = 15;
+        allLocations.forEach((loc) => {
+          const dx = loc.x + offsetX - lng;
+          const dy = loc.y - lat;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < min) {
+            min = d;
+            found = loc;
+          }
+        });
+        if (found) {
+          L.popup()
+            .setLatLng([found.y, found.x + offsetX])
+            .setContent(`<b>${found.name}</b><br>${found.type}`)
+            .openOn(map);
+        }
+      });
     </script>
   </body>
 </html>
