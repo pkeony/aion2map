@@ -86,6 +86,8 @@
 
       .star {
         cursor: pointer;
+        color: #ffd700; /* ⭐ 노란색 */
+        font-size: 16px;
       }
 
       #favoritesBox {
@@ -614,13 +616,28 @@
 
       function renderFavorites() {
         favDiv.innerHTML = '';
+
         favorites.forEach((name) => {
           const loc = allLocations.find((l) => l.name === name);
           if (!loc) return;
+
           const div = document.createElement('div');
           div.className = 'item ' + loc.type;
-          div.textContent = name;
+
+          div.innerHTML = `
+      <span>${name}</span>
+      <span class="star">★</span>
+    `;
+
+          // 위치 이동
           div.onclick = () => focus(loc);
+
+          // ⭐ 즐겨찾기에서 바로 삭제
+          div.querySelector('.star').onclick = (e) => {
+            e.stopPropagation(); // 지도 이동 방지
+            toggleFav(name);
+          };
+
           favDiv.appendChild(div);
         });
       }
