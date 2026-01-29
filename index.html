@@ -64,7 +64,6 @@
     </style>
   </head>
   <body>
-    <!-- 사이드바 -->
     <div id="sidebar">
       <input id="searchInput" placeholder="포탈 이름 검색 (엔터 가능)" />
 
@@ -86,7 +85,6 @@
       <div id="favorites"></div>
     </div>
 
-    <!-- 지도 -->
     <div id="map"></div>
 
     <script>
@@ -431,12 +429,12 @@
       }
 
       /* =========================
-   즐겨찾기 저장
+   즐겨찾기
 ========================= */
       let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
 
       /* =========================
-   마커 생성
+   마커
 ========================= */
       let activeMarker = null;
 
@@ -447,6 +445,34 @@
         marker.bindPopup(p.name);
         return marker;
       });
+
+      /* =========================
+   이동 + 중앙 보정 함수 ⭐
+========================= */
+      function focusPortal(marker) {
+        if (activeMarker) activeMarker.setStyle({ radius: 5 });
+        marker.setStyle({ radius: 9 });
+        activeMarker = marker;
+
+        const sidebarWidth = 320;
+
+        // 현재 줌 기준으로 좌표 → 픽셀 변환
+        const point = map.project(marker.getLatLng(), map.getZoom());
+
+        // 사이드바 보정 (왼쪽에 있으니까 +)
+        point.x -= sidebarWidth / 2;
+
+        // 다시 좌표로 변환
+        const targetLatLng = map.unproject(point, map.getZoom());
+
+        // ⭐ 무조건 이동
+        map.flyTo(targetLatLng, 1.5, {
+          animate: true,
+          duration: 0.6,
+        });
+
+        marker.openPopup();
+      }
 
       /* =========================
    즐겨찾기 토글
@@ -472,38 +498,32 @@
         const resultsDiv = document.getElementById('results');
         resultsDiv.innerHTML = '';
 
-        const matches = portalMarkers.filter((m) => {
-          const matchName = normalize(m.portalName).includes(keyword);
-          const matchCategory = category === 'all' || m.category === category;
-          return matchName && matchCategory;
-        });
+        portalMarkers
+          .filter((m) => {
+            const matchName = normalize(m.portalName).includes(keyword);
+            const matchCategory = category === 'all' || m.category === category;
+            return matchName && matchCategory;
+          })
+          .forEach((m) => {
+            const div = document.createElement('div');
+            div.className = 'item';
 
-        matches.forEach((m) => {
-          const div = document.createElement('div');
-          div.className = 'item';
+            const isFav = favorites.includes(m.portalName);
 
-          const isFav = favorites.includes(m.portalName);
-
-          div.innerHTML = `
+            div.innerHTML = `
       <span>${m.portalName}</span>
       <span class="star">${isFav ? '⭐' : '☆'}</span>
     `;
 
-          div.onclick = () => {
-            if (activeMarker) activeMarker.setStyle({ radius: 5 });
-            m.setStyle({ radius: 9 });
-            activeMarker = m;
-            map.setView(m.getLatLng(), 1.5);
-            m.openPopup();
-          };
+            div.onclick = () => focusPortal(m);
 
-          div.querySelector('.star').onclick = (e) => {
-            e.stopPropagation();
-            toggleFavorite(m.portalName);
-          };
+            div.querySelector('.star').onclick = (e) => {
+              e.stopPropagation();
+              toggleFavorite(m.portalName);
+            };
 
-          resultsDiv.appendChild(div);
-        });
+            resultsDiv.appendChild(div);
+          });
       }
 
       /* =========================
@@ -524,13 +544,7 @@
         <span class="star">⭐</span>
       `;
 
-            div.onclick = () => {
-              if (activeMarker) activeMarker.setStyle({ radius: 5 });
-              m.setStyle({ radius: 9 });
-              activeMarker = m;
-              map.setView(m.getLatLng(), 1.5);
-              m.openPopup();
-            };
+            div.onclick = () => focusPortal(m);
 
             div.querySelector('.star').onclick = (e) => {
               e.stopPropagation();
