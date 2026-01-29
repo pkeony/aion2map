@@ -551,14 +551,15 @@
 
       function moveAndZoomTo(marker) {
         const target = marker.getLatLng();
-        const zoomLevel = map.getMaxZoom() - 0.5;
+
+        // 🎯 너무 과한 확대 방지
+        const zoomLevel = map.getMaxZoom() - 1;
 
         map.flyTo(target, zoomLevel, {
           animate: true,
           duration: 0.8,
         });
 
-        // ⭐ 기존 팝업만 사용 (새로 만들지 않음)
         setTimeout(() => {
           marker.openPopup();
         }, 300);
