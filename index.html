@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>아이온2 포탈 검색</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        display: flex;
+        height: 100vh;
+        font-family: Arial, sans-serif;
+      }
+
+      #sidebar {
+        width: 320px;
+        background: #111;
+        color: #fff;
+        padding: 10px;
+        box-sizing: border-box;
+        overflow-y: auto;
+      }
+
+      #map {
+        flex: 1;
+      }
+
+      input,
+      select,
+      button {
+        width: 100%;
+        padding: 6px;
+        margin-bottom: 6px;
+        box-sizing: border-box;
+      }
+
+      .result {
+        padding: 6px;
+        border-bottom: 1px solid #333;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .result:hover {
+        background: #222;
+      }
+
+      .star {
+        cursor: pointer;
+      }
+
+      .active {
+        background: #333;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="sidebar">
+      <input id="searchInput" placeholder="포탈 이름 검색 (엔터 가능)" />
+
+      <select id="categoryFilter">
+        <option value="all">전체</option>
+        <option value="마을">마을</option>
+        <option value="야영지">야영지</option>
+        <option value="절벽">절벽</option>
+        <option value="유적">유적</option>
+        <option value="기타">기타</option>
+      </select>
+
+      <button onclick="searchPortal()">검색</button>
+
+      <h3>검색 결과</h3>
+      <div id="results"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+      /* =====================
+   데이터
+===================== */
+      const portals = [
+        {
+          name: '도망자 마을 절벽',
+          x: 458,
+          y: 695,
+        },
+        {
+          name: '도망자 마을',
+          x: 400,
+          y: 664,
+        },
+        {
+          name: '가톨리크의 검문소',
+          x: 391,
+          y: 633,
+        },
+        {
+          name: '방치된 화장터',
+          x: 297,
+          y: 628,
+        },
+        {
+          name: '묘지기 막사',
+          x: 322,
+          y: 603,
+        },
+        {
+          name: '고요한 언덕 버섯 바위',
+          x: 276,
+          y: 577,
+        },
+        {
+          name: '고요한 언덕 해안 절벽',
+          x: 258,
+          y: 565,
+        },
+        {
+          name: '송곳니 은신처',
+          x: 336,
+          y: 571,
+        },
+        {
+          name: '임시 도피처',
+          x: 320,
+          y: 524,
+        },
+        {
+          name: '콰이링 야영지',
+          x: 371,
+          y: 589,
+        },
+        {
+          name: '크레이온 야영지',
+          x: 389,
+          y: 597,
+        },
+        {
+          name: '임시 조사 기지',
+          x: 434,
+          y: 610,
+        },
+        {
+          name: '진흙탕 야영지',
+          x: 416,
+          y: 559,
+        },
+        {
+          name: '트라네인 구릉지 교각 아래',
+          x: 407,
+          y: 548,
+        },
+        {
+          name: '감시자의 천막',
+          x: 380,
+          y: 553,
+        },
+        {
+          name: '성소 감시초소 공중섬',
+          x: 336,
+          y: 465,
+        },
+        {
+          name: '외딴 섬',
+          x: 246,
+          y: 409,
+        },
+        {
+          name: '파도치는 절벽',
+          x: 360,
+          y: 428,
+        },
+        {
+          name: '모슬란 숲 절벽',
+          x: 396,
+          y: 495,
+        },
+        {
+          name: '오다르의 그늘',
+          x: 449,
+          y: 507,
+        },
+        {
+          name: '무너진 틈',
+          x: 441,
+          y: 476,
+        },
+        {
+          name: '모슬란 숲 매마른 그늘',
+          x: 460,
+          y: 472,
+        },
+        {
+          name: '엘림의 쉼터',
+          x: 456,
+          y: 441,
+        },
+        {
+          name: '숲의 은신처',
+          x: 497,
+          y: 486,
+        },
+        {
+          name: '버려진 유적지',
+          x: 509,
+          y: 513,
+        },
+        {
+          name: '미누샤 유적지',
+          x: 547,
+          y: 508,
+        },
+        {
+          name: '우르툼헤임 절벽',
+          x: 573,
+          y: 510,
+        },
+        {
+          name: '승전 데바의 석상',
+          x: 526,
+          y: 562,
+        },
+        {
+          name: '회복의 샘',
+          x: 535,
+          y: 580,
+        },
+        {
+          name: '인도자의 쉼터',
+          x: 596,
+          y: 586,
+        },
+        {
+          name: '빛바랜 그루터기',
+          x: 590,
+          y: 616,
+        },
+        {
+          name: '찬바람 피난처',
+          x: 571,
+          y: 653,
+        },
+        {
+          name: '은신 동굴',
+          x: 587,
+          y: 755,
+        },
+        {
+          name: '드라낙투스 해안',
+          x: 634,
+          y: 736,
+        },
+        {
+          name: '격전의 언덕 절벽 끝',
+          x: 634,
+          y: 690,
+        },
+        {
+          name: '바스펠트 폭포',
+          x: 682,
+          y: 671,
+        },
+        {
+          name: '바스펠트 폭포 아치 지대',
+          x: 716,
+          y: 708,
+        },
+        {
+          name: '도굴꾼 야영지',
+          x: 689,
+          y: 626,
+        },
+        {
+          name: '틈새 동굴',
+          x: 747,
+          y: 622,
+        },
+        {
+          name: '슈라크 노점',
+          x: 675,
+          y: 586,
+        },
+        {
+          name: '정화의 숲 볕 드는 언덕',
+          x: 648,
+          y: 609,
+        },
+        {
+          name: '정화의 숲 해안 절벽',
+          x: 632,
+          y: 580,
+        },
+        {
+          name: '노르니르 집회소',
+          x: 605,
+          y: 539,
+        },
+        {
+          name: '바스펠트 폐허 절벽',
+          x: 709,
+          y: 563,
+        },
+        {
+          name: '마힌데르 절벽',
+          x: 689,
+          y: 528,
+        },
+        {
+          name: '강철망치 무역단 본부',
+          x: 719,
+          y: 499,
+        },
+        {
+          name: '그리바데 구릉지 갈래길',
+          x: 683,
+          y: 486,
+        },
+        {
+          name: '강철망치 작업장',
+          x: 670,
+          y: 448,
+        },
+        {
+          name: '버려진 야영지',
+          x: 645,
+          y: 409,
+        },
+        {
+          name: '그리바데 구릉지 동부 꼬리 섬',
+          x: 783,
+          y: 472,
+        },
+        {
+          name: '아문타의 은신처',
+          x: 730,
+          y: 426,
+        },
+        {
+          name: '이둔의 호수',
+          x: 688,
+          y: 383,
+        },
+        {
+          name: '그리바데 구릉지 동부 낭떠러지',
+          x: 728,
+          y: 395,
+        },
+        {
+          name: '강철망치 임시 교역소',
+          x: 713,
+          y: 366,
+        },
+        {
+          name: '젠카카의 무덤',
+          x: 673,
+          y: 356,
+        },
+        {
+          name: '무너진 명예의 전당',
+          x: 681,
+          y: 302,
+        },
+        {
+          name: '끝자락 노점',
+          x: 669,
+          y: 281,
+        },
+        {
+          name: '임페투시움 아랫길',
+          x: 649,
+          y: 264,
+        },
+        {
+          name: '쿰리카의 지하실',
+          x: 612,
+          y: 313,
+        },
+        {
+          name: '비밀 접선지',
+          x: 623,
+          y: 324,
+        },
+      ];
+
+      /* =====================
+   지도
+===================== */
+      const imageWidth = 1021;
+      const imageHeight = 1022;
+
+      const map = L.map('map', {
+        crs: L.CRS.Simple,
+        minZoom: -2,
+        maxZoom: 2,
+      });
+
+      const bounds = [
+        [0, 0],
+        [imageHeight, imageWidth],
+      ];
+      L.imageOverlay('aion2-map.png', bounds).addTo(map);
+      map.fitBounds(bounds);
+
+      /* =====================
+   유틸
+===================== */
+      function normalize(str) {
+        return str.replace(/\s+/g, '').toLowerCase();
+      }
+
+      function getCategory(name) {
+        if (name.includes('마을')) return '마을';
+        if (name.includes('야영지')) return '야영지';
+        if (name.includes('절벽')) return '절벽';
+        if (name.includes('유적')) return '유적';
+        return '기타';
+      }
+
+      /* =====================
+   즐겨찾기
+===================== */
+      let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+
+      function toggleFavorite(name) {
+        if (favorites.includes(name)) {
+          favorites = favorites.filter((f) => f !== name);
+        } else {
+          favorites.push(name);
+        }
+        localStorage.setItem('favorites', JSON.stringify(favorites));
+        searchPortal();
+      }
+
+      /* =====================
+   마커
+===================== */
+      const portalMarkers = portals.map((p) => {
+        const marker = L.circleMarker([p.y, p.x], { radius: 5 }).addTo(map);
+        marker.portalName = p.name;
+        marker.category = getCategory(p.name);
+        marker.bindPopup(p.name);
+        return marker;
+      });
+
+      let activeMarker = null;
+
+      /* =====================
+   검색
+===================== */
+      function searchPortal() {
+        const keyword = normalize(document.getElementById('searchInput').value);
+        const category = document.getElementById('categoryFilter').value;
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+
+        const matches = portalMarkers.filter((m) => {
+          const matchName = normalize(m.portalName).includes(keyword);
+          const matchCategory = category === 'all' || m.category === category;
+          return matchName && matchCategory;
+        });
+
+        matches.forEach((m) => {
+          const div = document.createElement('div');
+          div.className = 'result';
+
+          const star = favorites.includes(m.portalName) ? '⭐' : '☆';
+
+          div.innerHTML = `
+      <span>${m.portalName}</span>
+      <span class="star">${star}</span>
+    `;
+
+          div.onclick = () => {
+            if (activeMarker) activeMarker.setStyle({ radius: 5 });
+            m.setStyle({ radius: 9 });
+            activeMarker = m;
+            map.setView(m.getLatLng(), 1.5);
+            m.openPopup();
+          };
+
+          div.querySelector('.star').onclick = (e) => {
+            e.stopPropagation();
+            toggleFavorite(m.portalName);
+          };
+
+          resultsDiv.appendChild(div);
+        });
+      }
+
+      /* 엔터 검색 */
+      document
+        .getElementById('searchInput')
+        .addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') searchPortal();
+        });
+    </script>
+  </body>
+</html>
