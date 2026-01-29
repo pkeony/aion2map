@@ -476,15 +476,21 @@
         return 6 + map.getZoom() * 2;
       }
 
-      allLocations.forEach((loc) => {
+      allLocations.forEach((loc, i) => {
         const color = loc.type === 'portal' ? '#2aa4ff' : '#ff3b3b';
+
         const m = L.circleMarker([loc.y, loc.x + offsetX], {
           radius: markerSize(),
           color,
           fillColor: color,
           fillOpacity: 0.9,
         }).addTo(map);
+
         m.bindPopup(`<b>${loc.name}</b><br>${loc.type}`);
+
+        m.locData = loc; // 🔥 마커에 위치 데이터 저장
+        m.locId = i; // 🔥 고유 ID
+
         markers.push(m);
       });
 
@@ -516,14 +522,18 @@
 
       function focus(loc) {
         const marker = markers.find(
-          (m) =>
-            m.getLatLng().lat === loc.y && m.getLatLng().lng === loc.x + offsetX
+          (m) => m.locId === allLocations.indexOf(loc)
         );
+        if (!marker) return;
 
-        if (marker) {
-          map.setView(marker.getLatLng(), 2, { animate: true });
-          marker.openPopup(); // 🔥 말풍선 열기
-        }
+        const target = marker.getLatLng();
+
+        map.flyTo(target, 2, {
+          animate: true,
+          duration: 0.8,
+        });
+
+        setTimeout(() => marker.openPopup(), 300);
       }
 
       function toggleFav(name) {
